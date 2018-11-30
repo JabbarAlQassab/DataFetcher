@@ -1,0 +1,60 @@
+from selenium.webdriver import Chrome
+from selenium.webdriver.support.select import Select
+# from selenium.webdriver.common.action_chains import ActionChains
+from bs4 import BeautifulSoup as soup
+import pymysql
+
+# path of where the ChromeDriver is saved in the computer
+# the path of the driver may differ from machine to another !
+path = "/Users/SWE417/Desktop/chromedriver"
+driver = Chrome(executable_path=path)
+# opining the website in the browser to start fetching
+driver.get("https://registrar.kfupm.edu.sa/courseoffering")
+
+# connect to SQL DB
+conn = pymysql.connect(host='sql145.main-hosting.eu', user='u174279753_admin', password='Qaz12345', db='u174279753_kss')
+
+
+# role into the dropdown list of departments
+for x in range(1,31):
+
+    # select department from the dropdown list
+    Select(driver.find_element_by_name("ctl00$CntntPlcHldr$ddlDept")).select_by_index(x)
+    department_name = Select(driver.find_element_by_name("ctl00$CntntPlcHldr$ddlDept")).first_selected_option.text
+    print (department_name)
+
+    # getting the HTML code from thr diver
+    html = driver.execute_script("return document.documentElement.outerHTML;")
+    # parsing the HTML to the soup to start fetching data
+    page_soup = soup(html, features="html.parser")
+
+    # getting the start of the rope ( where needed data start appearing )
+    # this is the hole section data row
+    table_row = page_soup.findAll("div", {"class": "trow"})
+
+    # role into the needed data within the department
+    for y in range(0, len(table_row)):
+
+        # getting the name of the course only from the raw
+        row_child = table_row[y].findChild()
+
+        course_name = row_child.text
+        # trimming unwanted text from the course name
+        course_name = course_name[11: len(course_name) - 3]
+        print(course_name)
+
+        # getting the title of the course only from the raw
+        course_title = row_child.next_sibling.next_sibling.next_sibling.text
+        # trimming unwanted text from the course title
+        course_title = course_title.strip('Course Name:')
+        print(course_title)
+
+        # inserting data to Courses table in KSS MySQL database
+        try:
+            cursor = conn.cursor()
+            sql = 'insert into Courses values (%s ,%s , %s)'
+            cursor.execute(sql, (department_name, course_name, course_title))
+            conn.commit()
+        except:
+            print ("^^ Duplicated course! ^^")
+
